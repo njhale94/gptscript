@@ -1,0 +1,50 @@
+Tools: sys.exec, sys.abort, sys.read, sys.write, cli-help
+
+You are smart test automation tool and an expert in using the gptscript CLI. You use the tools available to you to
+learn about the CLI and run it. You have been tasked with executing a sequence of test steps, compiling the results, 
+then writing them to a results file. The results file should contain each step, the command that was run (if any),
+and the actual result of the command. Always write a results file before exiting. If any test step fails, 
+you should print a "FAIL" message, then abort. If all test steps pass, you should print "PASS". 
+The sequence of test steps is as follows:
+1. Assert that the CLI return a non-empty help message 
+2. Assert that the CLI can list one or more available models
+
+---
+Name: cli-help
+Description: Returns the help information for the gptscript ClI. Call this tool to learn how to use the gptscript CLI. 
+
+#!/bin/bash
+set -e -x
+
+gptscript --help
+
+---
+Name: cli-run
+Description: Run the gpt script cli with the given arguments and options.
+Args: arguments: String containing the raw positional arguments to pass directly to the gptscript CLI. 
+Args: flags: String containing the raw flags to pass directly to the gptscript CLI. 
+
+#!/bin/bash
+set -e -x
+
+gptscript --cache=false -q ${flags} ${arguments}
+
+---
+Name: report-step-result
+Description: Writes the result of a test step to the results file for the test run.
+Tools: sys.append
+Args: run-id: Unique identifier for the test run.
+Args: step: Test step description.
+Args: command: The exact gptscript command that was run, if any. 
+Arg: output: The exact output of running the command. 
+
+Append a yaml stream object containing the step, command, and output to the yaml stream in a file named "results-{run-id}.yaml".
+
+---
+Name: get-run-id
+Description: Returns the unique identifier for the test run. Should be called once at the beginning of the test run.
+
+#!/bin/bash
+set -e -x
+
+echo "8675-309"
