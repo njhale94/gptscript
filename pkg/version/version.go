@@ -5,8 +5,10 @@ import (
 	"runtime/debug"
 )
 
+const devTag = "v0.0.0-dev"
+
 var (
-	Tag         = "v0.0.0-dev"
+	Tag         = devTag
 	ProgramName = "gptscript"
 )
 
@@ -29,7 +31,7 @@ func NewVersion(tag string) Version {
 }
 
 func (v Version) String() string {
-	if len(v.Commit) < 12 {
+	if v.Tag != devTag && len(v.Tag) < 12 {
 		return v.Tag
 	} else if v.Dirty {
 		return fmt.Sprintf("%s-%s-dirty", v.Tag, v.Commit[:8])
