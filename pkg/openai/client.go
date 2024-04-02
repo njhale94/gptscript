@@ -39,6 +39,7 @@ type Client struct {
 	invalidAuth  bool
 	cacheKeyBase string
 	setSeed      bool
+	user         string
 }
 
 type Options struct {
@@ -47,6 +48,7 @@ type Options struct {
 	APIVersion   string         `usage:"OpenAI API Version (for Azure)" name:"openai-api-version" env:"OPENAI_API_VERSION"`
 	APIType      openai.APIType `usage:"OpenAI API Type (valid: OPEN_AI, AZURE, AZURE_AD)" name:"openai-api-type" env:"OPENAI_API_TYPE"`
 	OrgID        string         `usage:"OpenAI organization ID" name:"openai-org-id" env:"OPENAI_ORG_ID"`
+	User         string         `usage:"OpenAI user" name:"openai-user" env:"OPENAI_USER"`
 	DefaultModel string         `usage:"Default LLM model to use" default:"gpt-4-turbo-preview"`
 	SetSeed      bool           `usage:"-"`
 	CacheKey     string         `usage:"-"`
@@ -55,6 +57,7 @@ type Options struct {
 
 func complete(opts ...Options) (result Options, err error) {
 	for _, opt := range opts {
+		result.User = types.FirstSet(opt.User, result.User)
 		result.BaseURL = types.FirstSet(opt.BaseURL, result.BaseURL)
 		result.APIKey = types.FirstSet(opt.APIKey, result.APIKey)
 		result.OrgID = types.FirstSet(opt.OrgID, result.OrgID)
@@ -125,6 +128,7 @@ func NewClient(opts ...Options) (*Client, error) {
 		cacheKeyBase: cacheKeyBase,
 		invalidAuth:  opt.APIKey == "" && opt.BaseURL == "",
 		setSeed:      opt.SetSeed,
+		user:         opt.User,
 	}, nil
 }
 
@@ -318,6 +322,7 @@ func (c *Client) Call(ctx context.Context, messageRequest types.CompletionReques
 		Model:     messageRequest.Model,
 		Messages:  msgs,
 		MaxTokens: messageRequest.MaxTokens,
+		User:      c.user,
 	}
 
 	if messageRequest.Temperature == nil {
