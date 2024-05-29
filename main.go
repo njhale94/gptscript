@@ -13,7 +13,7 @@ import (
 )
 
 var log = mvl.Package()
-
+// Test #0
 func main() {
 	if len(os.Args) > 2 && os.Args[1] == "sys.daemon" {
 		if os.Getenv("GPTSCRIPT_DEBUG") == "true" {
