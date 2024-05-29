@@ -1,23 +1,56 @@
 name: test
+
 on:
+  pull_request_target:
+    types:
+    - opened
+    - synchronize
+    - reopened
+    branches:
+    - main
+    - test/smoke
+
   push:
     branches:
       - main
+      - test/smoke # TODO(njhale): Remove me after testing
     paths-ignore:
       - docs/**
-  pull_request:
-    branches:
-      - main
-    paths-ignore:
-      - docs/**
+  workflow_dispatch:
+    inputs:
+      smoke_model:
+        type: choice
+        description: Model to smoke test
+        default: ''
+        options:
+          - ''
+          - gpt-4o-2024-05-13
+          - gpt-4-turbo-2024-04-09
+          - claude-3-opus-20240229
+          - mistral-large-2402
+          - gemini-1.5-pro-preview-0409
 
 jobs:
-  test:
+  unit:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout base repository
+        uses: actions/checkout@v4
         with:
+          # Checkout the base repository to access secrets and workflows
           fetch-depth: 1
+          repository: ${{ github.repository }}
+          ref: ${{ github.ref }}
+
+      - name: Checkout PR code
+        if: ${{ github.event_name == 'pull_request_target' }}
+        uses: actions/checkout@v4
+        with:
+          # Checkout the head repository to test a PR's code changes
+          fetch-depth: 1
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.ref }}
+
       - uses: actions/setup-go@v5
         with:
           cache: false
@@ -30,3 +63,72 @@ jobs:
         run: make build
       - name: Run Tests
         run: make test
+
+  smoke-gpt-4o-2024-05-13:
+    needs: unit
+    if: ${{ github.event.inputs.smoke_model == 'gpt-4o-2024-05-13' || github.event.inputs.smoke_model == '' }}
+    runs-on: ubuntu-22.04
+    environment: smoke
+
+    steps:
+      - name: Checkout base repository
+        uses: actions/checkout@v4
+        with:
+          # Checkout the base repository to access secrets and workflows
+          fetch-depth: 1
+          repository: ${{ github.repository }}
+          ref: ${{ github.ref }}
+
+      - name: Checkout PR code
+        if: ${{ github.event_name == 'pull_request_target' }}
+        uses: actions/checkout@v4
+        with:
+          # Checkout the head repository to test a PR's code changes
+          fetch-depth: 1
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - uses: actions/setup-go@v5
+        with:
+          cache: false
+          go-version: "1.21"
+
+      - env:
+          OPENAI_API_KEY: ${{ secrets.SMOKE_OPENAI_API_KEY }}
+          GPTSCRIPT_DEFAULT_MODEL: gpt-4o-2024-05-13
+        run: env
+
+  smoke-gpt-4-turbo-2024-04-09:
+    needs: unit
+    if: ${{ github.event.inputs.smoke_model == 'gpt-4-turbo-2024-04-09' || github.event.inputs.smoke_model == '' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout base repository
+        uses: actions/checkout@v4
+        with:
+          # Checkout the base repository to access secrets and workflows
+          fetch-depth: 1
+          repository: ${{ github.repository }}
+          ref: ${{ github.ref }}
+
+      - name: Checkout PR code
+        if: ${{ github.event_name == 'pull_request_target' }}
+        uses: actions/checkout@v4
+        with:
+          # Checkout the head repository to test a PR's code changes
+          fetch-depth: 1
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - uses: actions/setup-go@v5
+        with:
+          cache: false
+          go-version: "1.21"
+
+      - env:
+          OPENAI_API_KEY: ${{ secrets.SMOKE_OPENAI_API_KEY }}
+          GPTSCRIPT_DEFAULT_MODEL: gpt-4-turbo-2024-04-09
+        run: env
+
+
