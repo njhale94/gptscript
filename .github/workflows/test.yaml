@@ -2,36 +2,16 @@ name: test
 
 on:
   pull_request_target:
-    types: [ opened, synchronize, reopened ]
+    types: [opened, synchronize, reopened, labeled]
     branches:
       - main
       - test/smoke
-
   push:
     branches:
       - main
-      - test/smoke # TODO(njhale): Remove me after testing
+      - test/smoke
     paths-ignore:
       - docs/**
-
-  #  pull_request:
-  #    branches:
-  #      - main
-  #      - test/smoke
-
-  workflow_dispatch:
-    inputs:
-      smoke_model:
-        type: choice
-        description: Model to smoke test
-        default: ''
-        options:
-          - ''
-          - gpt-4o-2024-05-13
-          - gpt-4-turbo-2024-04-09
-          - claude-3-opus-20240229
-          - mistral-large-2402
-          - gemini-1.5-pro-preview-0409
 
 jobs:
   unit:
@@ -40,24 +20,16 @@ jobs:
       - name: Checkout base repository
         uses: actions/checkout@v4
         with:
-          # Checkout the base repository to access secrets and workflows
           fetch-depth: 1
           repository: ${{ github.repository }}
           ref: ${{ github.ref }}
-
       - name: Checkout PR code
         if: ${{ github.event_name == 'pull_request_target' }}
         uses: actions/checkout@v4
         with:
-          # Checkout the head repository to test a PR's code changes
           fetch-depth: 1
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.ref }}
-
-      #      - uses: actions/checkout@v4
-      #        with:
-      #          fetch-depth: 1
-
       - uses: actions/setup-go@v5
         with:
           cache: false
@@ -71,78 +43,149 @@ jobs:
       - name: Run Tests
         run: make test
 
-  smoke-gpt-4o-2024-05-13:
+  check-label:
     needs: unit
-    if: ${{ github.event.inputs.smoke_model == 'gpt-4o-2024-05-13' || github.event.inputs.smoke_model == '' }}
     runs-on: ubuntu-22.04
+    outputs:
+      run_smoke_tests: ${{ steps.check.outputs.run_smoke_tests }}
+    steps:
+      - name: Check if PR author is a member of the organization or has the run-smoke label
+        id: check
+        run: |
+          ORG="YOUR_ORG"
+          USERNAME="${{ github.event.pull_request.user.login }}"
+          RESPONSE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/orgs/$ORG/members/$USERNAME")
+          LABELS=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository_owner }}/${{ github.event.repository.name }}/issues/${{ github.event.pull_request.number }}/labels" | jq -r '.[].name')
+          if [ "$RESPONSE" == "{}" ]; then
+            echo "::set-output name=run_smoke_tests::true"
+          elif echo "$LABELS" | grep -q "run-smoke"; then
+            echo "::set-output name=run_smoke_tests::true"
+          else
+            echo "::set-output name=run_smoke_tests::false"
+          fi
 
+  smoke-gpt-4o-2024-05-13:
+    needs: check-label
+    if: ${{ needs.check-label.outputs.run_smoke_tests == 'true' || github.event_name == 'push' }}
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout base repository
         uses: actions/checkout@v4
         with:
-          # Checkout the base repository to access secrets and workflows
           fetch-depth: 1
-          repository: ${{ github.repository }}
-          ref: ${{ github.ref }}
-
-      - name: Checkout PR code
+      - name: Checkout PR code if running for a PR
         if: ${{ github.event_name == 'pull_request_target' }}
         uses: actions/checkout@v4
         with:
-          # Checkout the head repository to test a PR's code changes
           fetch-depth: 1
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.ref }}
-
-      #      - uses: actions/checkout@v4
-      #        with:
-      #          fetch-depth: 1
-
       - uses: actions/setup-go@v5
         with:
           cache: false
           go-version: "1.21"
-
       - env:
           OPENAI_API_KEY: ${{ secrets.SMOKE_OPENAI_API_KEY }}
           GPTSCRIPT_DEFAULT_MODEL: gpt-4o-2024-05-13
-        run: env
+        name: Run smoke test for gpt-4o-2024-05-13
+        run: |
+          echo "${OPENAI_API_KEY}"
+          echo "Running smoke test for model gpt-4o-2024-05-13"
 
   smoke-gpt-4-turbo-2024-04-09:
-    needs: unit
-    if: ${{ github.event.inputs.smoke_model == 'gpt-4-turbo-2024-04-09' || github.event.inputs.smoke_model == '' }}
-    runs-on: ubuntu-latest
-
+    needs: check-label
+    if: ${{ needs.check-label.outputs.run_smoke_tests == 'true' || github.event_name == 'push' }}
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout base repository
         uses: actions/checkout@v4
         with:
-          # Checkout the base repository to access secrets and workflows
           fetch-depth: 1
-          repository: ${{ github.repository }}
-          ref: ${{ github.ref }}
-
-      - name: Checkout PR code
+      - name: Checkout PR code if running for a PR
         if: ${{ github.event_name == 'pull_request_target' }}
         uses: actions/checkout@v4
         with:
-          # Checkout the head repository to test a PR's code changes
           fetch-depth: 1
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.ref }}
-
-      #      - uses: actions/checkout@v4
-      #        with:
-      #          fetch-depth: 1
-
       - uses: actions/setup-go@v5
         with:
           cache: false
           go-version: "1.21"
-
       - env:
-          #          OPENAI_API_KEY: ${{ secrets.SMOKE_OPENAI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.SMOKE_OPENAI_API_KEY }}
           GPTSCRIPT_DEFAULT_MODEL: gpt-4-turbo-2024-04-09
-        run: env
+        name: Run smoke test for gpt-4-turbo-2024-04-09
+        run: |
+          echo "${OPENAI_API_KEY}"
+          echo "Running smoke test for model gpt-4-turbo-2024-04-09"
 
+  smoke-claude-3-opus-20240229:
+    needs: check-label
+    if: ${{ needs.check-label.outputs.run_smoke_tests == 'true' || github.event_name == 'push' }}
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout base repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Checkout PR code if running for a PR
+        if: ${{ github.event_name == 'pull_request_target' }}
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.ref }}
+      - uses: actions/setup-go@v5
+        with:
+          cache: false
+          go-version: "1.21"
+      - env:
+          OPENAI_API_KEY: ${{ secrets.SMOKE_OPENAI_API_KEY }}
+          GPTSCRIPT_DEFAULT_MODEL: claude-3-opus-20240229
+        name: Run smoke test for claude-3-opus-20240229
+        run: |
+          echo "${OPENAI_API_KEY}"
+          echo "Running smoke test for model claude-3-opus-20240229"
 
+  smoke-mistral-large-2402:
+    needs: check-label
+    if: ${{ needs.check-label.outputs.run_smoke_tests == 'true' || github.event_name == 'push' }}
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout base repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Checkout PR code if running for a PR
+        if: ${{ github.event_name == 'pull_request_target' }}
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.ref }}
+      - uses: actions/setup-go@v5
+        with:
+          cache: false
+          go-version: "1.21"
+      - env:
+          OPENAI_API_KEY: ${{ secrets.SMOKE_OPENAI_API_KEY }}
+          GPTSCRIPT_DEFAULT_MODEL: mistral-large-2402
+        name: Run smoke test for mistral-large-2402
+        run: |
+          echo "${OPENAI_API_KEY}"
+          echo "Running smoke test for model mistral-large-2402"
+
+  cleanup:
+    needs: [smoke-gpt-4o-2024-05-13, smoke-gpt-4-turbo-2024-04-09, smoke-claude-3-opus-20240229, smoke-mistral-large-2402]
+    runs-on: ubuntu-22.04
+    if: ${{ needs.check-label.outputs.run_smoke_tests == 'true' }}
+    steps:
+      - name: Remove run-smoke label
+        run: |
+          curl -X DELETE \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            https://api.github.com/repos/${{ github.repository_owner }}/${{ github.event.repository.name }}/issues/${{ github.event.pull_request.number }}/labels/run-smoke
