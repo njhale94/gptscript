@@ -2,13 +2,10 @@ name: test
 
 on:
   pull_request_target:
-    types:
-    - opened
-    - synchronize
-    - reopened
+    types: [ opened, synchronize, reopened ]
     branches:
-    - main
-    - test/smoke
+      - main
+      - test/smoke
 
   push:
     branches:
@@ -16,6 +13,12 @@ on:
       - test/smoke # TODO(njhale): Remove me after testing
     paths-ignore:
       - docs/**
+
+  #  pull_request:
+  #    branches:
+  #      - main
+  #      - test/smoke
+
   workflow_dispatch:
     inputs:
       smoke_model:
@@ -51,6 +54,10 @@ jobs:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.ref }}
 
+      #      - uses: actions/checkout@v4
+      #        with:
+      #          fetch-depth: 1
+
       - uses: actions/setup-go@v5
         with:
           cache: false
@@ -68,7 +75,6 @@ jobs:
     needs: unit
     if: ${{ github.event.inputs.smoke_model == 'gpt-4o-2024-05-13' || github.event.inputs.smoke_model == '' }}
     runs-on: ubuntu-22.04
-    environment: smoke
 
     steps:
       - name: Checkout base repository
@@ -87,6 +93,10 @@ jobs:
           fetch-depth: 1
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.ref }}
+
+      #      - uses: actions/checkout@v4
+      #        with:
+      #          fetch-depth: 1
 
       - uses: actions/setup-go@v5
         with:
@@ -121,13 +131,17 @@ jobs:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.ref }}
 
+      #      - uses: actions/checkout@v4
+      #        with:
+      #          fetch-depth: 1
+
       - uses: actions/setup-go@v5
         with:
           cache: false
           go-version: "1.21"
 
       - env:
-          OPENAI_API_KEY: ${{ secrets.SMOKE_OPENAI_API_KEY }}
+          #          OPENAI_API_KEY: ${{ secrets.SMOKE_OPENAI_API_KEY }}
           GPTSCRIPT_DEFAULT_MODEL: gpt-4-turbo-2024-04-09
         run: env
 
