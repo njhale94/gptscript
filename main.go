@@ -24,5 +24,7 @@ func main() {
 		}
 		os.Exit(0)
 	}
+
+	// Foo
 	cmd.Main(cli.New())
 }
